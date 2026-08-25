@@ -81,6 +81,14 @@ jobs:
           mkdir -p out
           pptx2pdf sample.pptx -o out/deck.pdf --converter libreoffice
           test -s out/deck.pdf
+      # 複数入力：1 つ失敗しても残りを変換し，終了コードは 1 になる．
+      - name: Convert several files, one of them missing
+        run: |
+          cp sample.pptx second.pptx
+          if pptx2pdf sample.pptx no-such-deck.pptx second.pptx --converter libreoffice; then
+            echo "ERROR: expected a failure"; exit 1
+          fi
+          test -s sample.pdf && test -s second.pdf
       # 変換器が無いときに黙って成功しない（無音失敗はいちばん見つけにくい）．
       - name: A missing converter fails loudly
         run: |
