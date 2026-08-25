@@ -138,15 +138,21 @@ def test_an_output_path_with_several_inputs_is_refused(calls, tmp_path):
 
 
 def test_a_reason_that_already_names_the_file_is_not_doubled(tmp_path, capsys):
-    """理由が既にパスを言っているなら重ねない（実物の ``convert`` を通す）．
+    """理由が既にパスで終わっているなら重ねない（実物の ``convert`` を通す）．
 
     ``pptx not found: <path>`` を名前付きで出すと、長いパスが 1 行に 2 度並ぶ．
+    変換器には ``cp`` を使う——**出力を実際に作る**ので、失敗した 1 つを飛ばして
+    残りが最後まで変換されることも一緒に確かめられる．
     """
     missing = tmp_path / "missing.pptx"
     good = tmp_path / "deck.pptx"
     good.write_bytes(b"not really a pptx")
-    with pytest.raises(SystemExit):
-        cli.main([str(missing), str(good), "--converter", "true {input}"])
-    err = capsys.readouterr().err
-    assert f"pptx2pdf: pptx not found: {missing}" in err
-    assert str(missing) not in err.replace(f"pptx not found: {missing}", "")
+    with pytest.raises(SystemExit, match="1 of 2 failed"):
+        cli.main([str(missing), str(good), "--converter", "cp {input} {output}"])
+    captured = capsys.readouterr()
+    assert f"pptx2pdf: pptx not found: {missing}" in captured.err
+    assert str(missing) not in captured.err.replace(
+        f"pptx not found: {missing}", "")
+    # 失敗の後ろの入力が飛ばされていないこと．
+    assert (tmp_path / "deck.pdf").is_file()
+    assert f"saved: {tmp_path / 'deck.pdf'}" in captured.out

@@ -95,10 +95,13 @@ def main(argv: list[str] | None = None) -> None:
             # 添え，残りを続ける．
             if not many:
                 raise SystemExit(f"pptx2pdf: {e}")
-            # 理由が既にそのパスを言っているなら重ねない（``pptx not found: <path>``
+            # 理由が既にそのパスで終わっているなら重ねない（``pptx not found: <path>``
             # を名前付きで出すと，長いパスが 1 行に 2 度並んで読みにくくなる）．
+            # ``in`` ではなく ``endswith`` で見るのは，**別のパスの前半に一致する**の
+            # を避けるため——``/tmp/a`` を変換していて理由が ``/tmp/abc.pptx`` を
+            # 言っている場合，名前を省くとどの入力の話か分からなくなる．
             reason = str(e)
-            head = "" if src in reason else f"{src}: "
+            head = "" if reason.endswith(src) else f"{src}: "
             sys.stderr.write(f"pptx2pdf: {head}{reason}\n")
             failed += 1
             continue
