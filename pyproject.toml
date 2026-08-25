@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pptx2pdf"
+dynamic = ["version"]
+description = "pptx を PDF に変換する（PowerPoint / LibreOffice / 任意のコマンド）"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Toshihiko SHIMOKAWA" }]
+keywords = ["powerpoint", "pptx", "pdf", "libreoffice", "convert"]
+# 依存はゼロ（標準ライブラリのみ）．外部プロセスを起こすだけなので python-pptx も要らない．
+dependencies = []
+
+[project.optional-dependencies]
+# 型チェックと単体テスト用（実行には不要）．CI と手元で同じものを入れる．
+dev = [
+    "mypy>=1.11",
+    "pytest>=8",
+]
+
+[project.urls]
+Repository = "https://github.com/toshi0806/pptx2pdf"
+
+[project.scripts]
+pptx2pdf = "pptx2pdf.cli:main"
+
+[tool.setuptools]
+packages = ["pptx2pdf"]
+
+# バージョンは pptx2pdf/__init__.py の __version__ を単一の情報源にする（二重管理を避ける）．
+[tool.setuptools.dynamic]
+version = { attr = "pptx2pdf.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+files = ["pptx2pdf"]
+# サポート最古の版として解析する（requires-python と揃える）．
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+disallow_untyped_defs = true

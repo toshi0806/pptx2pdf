@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      # mypy は pyproject の python_version（= サポート最古）として解析するので，
+      # 実行する処理系は 1 つで足りる．
+      - run: pip install -e ".[dev]"
+      - run: mypy
+
+  # 判断そのもの（auto の探索、待ちの上限、差し替え）を固定する単体テスト．
+  # 外部プロセスを起こさないので、変換器の無い runner でも走る．
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 下限は pyproject の requires-python，上限は開発機の版．
+        # mypy が通ることと実際に動くことは別なので、実行は複数版で確かめる．
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: pytest
+
+  # 実際に変換まで通す．runner に PowerPoint は無いので LibreOffice 経路のみ．
+  # 入力の pptx は python-pptx で作る（この検証のためだけに入れる．pptx2pdf 自身は
+  # python-pptx に依存しない）．
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: sudo apt-get update && sudo apt-get install -y libreoffice-impress poppler-utils
+      - run: pip install -e . python-pptx
+      - name: Make a 3-slide deck to convert
+        run: |
+          python - <<'PY'
+          from pptx import Presentation
+          p = Presentation()
+          for i in range(3):
+              s = p.slides.add_slide(p.slide_layouts[5])
+              s.shapes.title.text = f"slide {i + 1}"
+          p.save("sample.pptx")
+          PY
+      - run: pptx2pdf sample.pptx --converter libreoffice
+      # 期待値は**入力の pptx から引く**．固定値を書くと、入力を増やしたときに
+      # 2 か所を直すことになり、片方を忘れるとここだけが後から落ちる．
+      - name: Check the PDF has one page per slide
+        run: |
+          test -f sample.pdf
+          slides=$(python -c "from pptx import Presentation; print(len(Presentation('sample.pptx').slides))")
+          test -n "$slides" || { echo "ERROR: could not read the slide count"; exit 1; }
+          pages=$(pdfinfo sample.pdf | awk '/^Pages/{print $2}')
+          test -n "$pages" || { echo "ERROR: could not read the page count"; exit 1; }
+          echo "slides=$slides pages=$pages"
+          test "$pages" = "$slides"
+      # 既定の出力先（入力の隣）と -o の両方を通す．-o は別ディレクトリにして、
+      # 「変換器が書いた場所」から「指定された場所」への移動まで確かめる．
+      - name: Convert to an explicit path in another directory
+        run: |
+          mkdir -p out
+          pptx2pdf sample.pptx -o out/deck.pdf --converter libreoffice
+          test -s out/deck.pdf
+      # 変換器が無いときに黙って成功しない（無音失敗はいちばん見つけにくい）．
+      - name: A missing converter fails loudly
+        run: |
+          if pptx2pdf sample.pptx -o out/nope.pdf --converter 'no-such-converter {input} {output}'; then
+            echo "ERROR: expected a failure"; exit 1
+          fi
+          test ! -e out/nope.pdf
