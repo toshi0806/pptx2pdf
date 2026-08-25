@@ -31,6 +31,11 @@ pptx2pdf = "pptx2pdf.cli:main"
 [tool.setuptools]
 packages = ["pptx2pdf"]
 
+# 型注釈を配布物に含める印（PEP 561）．これが無いと，このパッケージを使う側の mypy は
+# 「型が分からない」ではなく **「モジュールが見つからない」** と言って落ちる．
+[tool.setuptools.package-data]
+pptx2pdf = ["py.typed"]
+
 # バージョンは pptx2pdf/__init__.py の __version__ を単一の情報源にする（二重管理を避ける）．
 [tool.setuptools.dynamic]
 version = { attr = "pptx2pdf.__version__" }
