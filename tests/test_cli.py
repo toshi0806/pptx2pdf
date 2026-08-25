@@ -80,3 +80,73 @@ def test_quiet_says_nothing_on_success(calls, tmp_path, capsys):
     """``-q`` は成功時に何も出さない（スクリプトから使うため）．"""
     cli.main([str(tmp_path / "deck.pptx"), "-q"])
     assert capsys.readouterr().out == ""
+
+
+def test_every_input_is_converted(calls, tmp_path, capsys):
+    """入力を複数渡せる．出力先はそれぞれの隣．"""
+    names = ["a.pptx", "b.pptx", "c.pptx"]
+    cli.main([str(tmp_path / n) for n in names])
+    assert [c["dst"] for c in calls] == [
+        str(tmp_path / n.replace(".pptx", ".pdf")) for n in names]
+    out = capsys.readouterr().out
+    assert out.count("saved: ") == 3
+
+
+def test_one_failure_does_not_abandon_the_rest(monkeypatch, tmp_path, capsys):
+    """1 つ失敗しても残りを変換し、最後に失敗数を伝えて終了コード 1．
+
+    ここが逆（最初の失敗で止まる）だと、``pptx2pdf *.pptx`` に壊れたファイルが
+    1 つ混じっただけで、その後ろが変換されたのかどうか分からなくなる．
+    """
+    done: list[str] = []
+
+    def fake(src, dst, conv, timeout=None, *, unattended=False):
+        if src.endswith("b.pptx"):
+            raise converter.PdfError("powerpoint failed: boom")
+        done.append(dst)
+
+    monkeypatch.setattr(cli, "convert", fake)
+    with pytest.raises(SystemExit) as e:
+        cli.main([str(tmp_path / n) for n in ("a.pptx", "b.pptx", "c.pptx")])
+    assert str(e.value) == "pptx2pdf: 1 of 3 failed"
+    assert done == [str(tmp_path / "a.pdf"), str(tmp_path / "c.pdf")]
+    err = capsys.readouterr().err
+    assert f"pptx2pdf: {tmp_path / 'b.pptx'}: powerpoint failed: boom" in err
+
+
+def test_one_input_still_reports_the_reason_alone(monkeypatch, tmp_path):
+    """入力が 1 つなら、どのファイルの話かは自明なので理由だけを出す（従来どおり）．"""
+    def boom(*args, **kwargs):
+        raise converter.PdfError("libreoffice failed: boom")
+
+    monkeypatch.setattr(cli, "convert", boom)
+    with pytest.raises(SystemExit) as e:
+        cli.main([str(tmp_path / "deck.pptx")])
+    assert str(e.value) == "pptx2pdf: libreoffice failed: boom"
+
+
+def test_an_output_path_with_several_inputs_is_refused(calls, tmp_path):
+    """``-o`` と複数入力は両立しない．
+
+    どれを書いても残りは黙って捨てられるので、最後の 1 つだけが残った状態を
+    「変換できた」と誤解させるより、何も始めずに断る．
+    """
+    with pytest.raises(SystemExit, match="takes a single input file"):
+        cli.main([str(tmp_path / "a.pptx"), str(tmp_path / "b.pptx"),
+                  "-o", str(tmp_path / "out.pdf")])
+    assert calls == []
+
+
+def test_a_reason_that_already_names_the_file_is_not_doubled(tmp_path, capsys):
+    """理由が既にパスを言っているなら重ねない（実物の ``convert`` を通す）．
+
+    ``pptx not found: <path>`` を名前付きで出すと、長いパスが 1 行に 2 度並ぶ．
+    """
+    missing = tmp_path / "missing.pptx"
+    good = tmp_path / "deck.pptx"
+    good.write_bytes(b"not really a pptx")
+    with pytest.raises(SystemExit):
+        cli.main([str(missing), str(good), "--converter", "true {input}"])
+    err = capsys.readouterr().err
+    assert f"pptx2pdf: pptx not found: {missing}" in err
+    assert str(missing) not in err.replace(f"pptx not found: {missing}", "")

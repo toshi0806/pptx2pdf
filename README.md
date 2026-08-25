@@ -10,6 +10,7 @@ pptx の中身は読まず、変換ツールを起こして結果を受け取る
 pptx2pdf slide.pptx                  # slide.pdf を隣に作る
 pptx2pdf slide.pptx -o preview.pdf   # 出力先を指定する
 pptx2pdf slide.pptx --converter libreoffice
+pptx2pdf *.pptx                      # まとめて変換する
 ```
 
 ## インストール
@@ -30,8 +31,8 @@ pip install .
 
 | オプション | 説明 |
 | --- | --- |
-| `INPUT.pptx` | 変換する pptx |
-| `-o PATH` / `--output PATH` | 出力する PDF。既定は入力と同じ場所・同じ名前の `.pdf` |
+| `INPUT.pptx` | 変換する pptx。**複数指定できます** |
+| `-o PATH` / `--output PATH` | 出力する PDF。既定は入力と同じ場所・同じ名前の `.pdf`。入力が1つのときだけ指定できます |
 | `--converter NAME\|COMMAND` | 変換器。`auto`（既定）/ `powerpoint` / `libreoffice` / 任意のコマンド行。環境変数 `PPTX2PDF_CONVERTER` を上書き |
 | `--timeout SEC` | 変換を諦めるまでの秒数（`0` で無制限）。環境変数 `PPTX2PDF_TIMEOUT` を上書き |
 | `--unattended` | 端末が tty でも「人は見ていない」として扱う（cron やエディタのタスク用） |
@@ -45,6 +46,9 @@ pip install .
   しまうので、「消してから書く」と開き直すまで自動リロードされなくなるためです。
 - **失敗したときは出力 PDF を消します。** 古い内容を新しい出力と取り違えないためです。
   終了コードは1で、理由は `pptx2pdf: …` の1行で stderr に出ます。
+- **入力を複数渡したときは、1つ失敗しても残りを変換します。** 失敗したものは名前と理由を
+  stderr に出し、最後に `pptx2pdf: 1 of 3 failed` と伝えて終了コード1で終わります
+  （`-q` を付けても失敗の報告は出ます）。
 
 ## 変換器
 
@@ -95,6 +99,11 @@ cron やエディタから実行したときのように**誰も応答できな�
   （端末から実行しているときは PowerPoint も前面に出します）。
 - **すでに PowerPoint を開いているときは、変換中にウィンドウが出ます。** 作業中の
   PowerPoint を勝手に隠さないための割り切りです（フォーカスは奪いません）。
+- **壊れた pptx を渡すと、その後の変換まで失敗することがあります。** PowerPoint が
+  開けなかったファイルのダイアログを抱えたままになるためで、隠して動かしている以上
+  それは画面に見えません。以後 `powerpoint` 経路が失敗し続けるときは、PowerPoint を
+  前面に出してダイアログに答えるか、いったん終了させてください
+  （`pptx2pdf *.pptx` のようにまとめて変換するときに出会いやすい挙動です）。
 - 変換は PowerPoint 自身のサンドボックスコンテナの中で行うので、入出力がどこにあっても
   ファイルアクセスの承認ダイアログは出ません。
 
