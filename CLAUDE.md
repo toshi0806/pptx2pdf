@@ -112,6 +112,19 @@ CI（`.github/workflows/ci.yml`）は3ジョブ。`typecheck` が mypy を1回�
   以上これは画面に見えないので、README に「前面に出して答えるか終了させる」と
   書いてある。ここで PowerPoint を殺す実装を足してはいけない（利用者が開いて
   使っているインスタンスかもしれない）。
+- **表示されるスライドが1枚も無い pptx は、どの変換器でも PDF にならない**（実測）。
+  講義デッキの予備・付録は `<p:sld … show="0">`（PowerPoint の「スライドを非表示にする」）
+  になっていることがあり、そこから1枚だけ切り出した pptx がこれに当たる。理由を言わずに
+  三者三様の失敗をするので、**症状から原因へ辿り着けない**:
+  macOS PowerPoint は `did not produce a (non-empty) PDF`、Windows PowerPoint は
+  `Presentation.SaveAs` のエラー、LibreOffice は `impl_store failed (Io Class:Write
+  Code:16)`。切り出す側で `show` を立てれば直る（python-pptx なら
+  `slide._element.set("show", "1")`）。
+  **ここで理由を添える実装は入れていない。** 判定には pptx の中身を読む必要があり、
+  「pptx を読まないから python-pptx に依存しない」というこのパッケージの前提と衝突する。
+  失敗として落ちること自体は正しい（空の PDF を黙って返すほうが困る）ので、
+  調べ方をここに残すのが釣り合うと判断した。切り分けは「図形だけ消す／スライドだけ絞る」
+  と「成功する番号と失敗する番号を比べる」で付く。
 - 各サブプロセス/Bash 間で `/tmp` の状態が保持されないことがある。
   生成→検証は1コマンド内で完結させると安全。
 
