@@ -119,7 +119,9 @@ CI（`.github/workflows/ci.yml`）は3ジョブ。`typecheck` が mypy を1回�
   macOS PowerPoint は `did not produce a (non-empty) PDF`、Windows PowerPoint は
   `Presentation.SaveAs` のエラー、LibreOffice は `impl_store failed (Io Class:Write
   Code:16)`。切り出す側で `show` を立てれば直る（python-pptx なら
-  `slide._element.set("show", "1")`）。
+  `slide.element.set("show", "1")`）。**python-pptx にこのフラグの API は無い**ので、
+  公開プロパティ `element`（スライドの lxml 要素）から XML の属性を直に触ることになる。
+  `_element` でも同じ要素が返るが、こちらは私物なので使わない。
   **ここで理由を添える実装は入れていない。** 判定には pptx の中身を読む必要があり、
   「pptx を読まないから python-pptx に依存しない」というこのパッケージの前提と衝突する。
   失敗として落ちること自体は正しい（空の PDF を黙って返すほうが困る）ので、
